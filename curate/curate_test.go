@@ -681,6 +681,44 @@ func TestParseExtractionResponse_QualityFlagsString(t *testing.T) {
 	}
 }
 
+func TestParseExtractionResponse_SkipsUnparseableItem(t *testing.T) {
+	// The parser must skip individual unparseable items (documented
+	// contract) while still returning the parseable ones: a bare
+	// non-object entry and an object that fails both the direct
+	// unmarshal and the quality_flags-drop fallback.
+	response := `[
+		{
+			"tag": "auth",
+			"category": "decision",
+			"confidence": "high",
+			"sources": [{"source_id": "disk-meetings", "document": "sprint-planning"}],
+			"content": "Use OAuth2."
+		},
+		42,
+		{"tag": "bad", "category": "decision", "content": "x", "confidence": 42}
+	]`
+
+	files, err := ParseExtractionResponse(response)
+	if err != nil {
+		t.Fatalf("ParseExtractionResponse: %v", err)
+	}
+	if len(files) != 1 {
+		t.Fatalf("got %d files, want 1", len(files))
+	}
+	if files[0].Tag != "auth" {
+		t.Errorf("files[0].Tag = %q, want %q", files[0].Tag, "auth")
+	}
+	if files[0].Category != "decision" {
+		t.Errorf("files[0].Category = %q, want %q", files[0].Category, "decision")
+	}
+	if files[0].Content != "Use OAuth2." {
+		t.Errorf("files[0].Content = %q, want %q", files[0].Content, "Use OAuth2.")
+	}
+	if files[0].Confidence != "high" {
+		t.Errorf("files[0].Confidence = %q, want %q", files[0].Confidence, "high")
+	}
+}
+
 func TestParseExtractionResponse_ConfidenceValidation(t *testing.T) {
 	tests := []struct {
 		confidence string
